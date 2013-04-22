@@ -87,6 +87,7 @@ struct con stu_index;//index in IDENTIFIER CONSTANT STRING_LITERAL table
 //extern char yytext[];
 void printlab();
 FILE *fp;
+extern FILE *yyout;
 int grammar;
 int used[250]={0};
 int varible[10][2];//save IDENTIFIER in expression
@@ -96,15 +97,20 @@ int tag_assign=0;//tag of assigment_expression  (right)
 int tag_control=0;//tag of for if while return ...
 int tag_array=0;
 int tag_function=0;
-int tag_dec_fun=0;//function declaration
+int tag_func_type=1;//function declara type,save type onle once
 char decl_type[10];//save type_specifier used for function declaration
-
+int tag_parameter=0;////function parameter declaration,used for r,r_ output only once
 int ecf=0;//global varible
-struct name_kj{//procedure associated wwith kj;
-char func_name[id_len];
-int kj;
-}
-struct name_kj func_kj[table_len];
+
+char function_name_table[table_len][id_len];//index is kj
+int kj=0;
+char function_name[id_len];//save function name in expression,for rule 8, if(ecf!=kj) error
+int tag_func_expr=0;//tag for if function used in expression
+//struct name_kj{//procedure associated wwith kj;
+//char func_name[id_len];
+//int kj;
+//};
+//struct name_kj func_kj[table_len];
 
 int ki[];
 
@@ -148,8 +154,7 @@ postfix_expression
 	: primary_expression  
 		{grammar= 5 ; printlab(grammar);}
 	|  postfix_expression '[' { vari_level++;tag_array=1;} expression ']' 
-		{
-			vari_level--;
+{		vari_level--;
 			tag_array=0;
 			grammar= 6 ;
 		printlab(grammar);
@@ -157,9 +162,16 @@ postfix_expression
 		strcat($1,$4);
 		strcat($1,"]"); 
 		strcpy($$,$1);}
-	
+	| postfix_expression '(' {tag_function=1;} ')' 
+		{grammar= 7 ; printlab(grammar);
+		strcpy(function_name,$1);
+		strcat($1,"(");
+		strcat($1,")");
+	        strcpy($$,$1);	
+		}
+
 	|  postfix_expression '(' {tag_function=1;} argument_expression_list ')'  
-		{//tag_function=0;
+	{	strcpy(function_name,$1);
 		grammar= 8 ; 
 		printlab(grammar);
 		strcat($1,"(");
@@ -361,7 +373,7 @@ declaration
 		strcat($1,";");
 		strcpy($$,$1);
 		grammar=  78;
-		printf("\n%s\n",$$);
+		fprintf(yyout,"\n%s\n",$$);
 	 //printf("xiaojie %s\n",$1);
 	 printlab(grammar);}//printf("qxj%s",sentence);}
 	;
@@ -369,7 +381,12 @@ declaration
 declaration_specifiers
 	//: storage_class_specifier  {grammar= 79 ; printlab(grammar);}
 	//| storage_class_specifier declaration_specifiers  {grammar= 80 ; printlab(grammar);}
-	: type_specifier  {strcpy(decl_type,$1);grammar= 81 ;printlab(grammar);}//printf("@%s@%s@@",$$,$1);}
+	: type_specifier  
+		{
+		if(tag_func_type)
+		strcpy(decl_type,$1);
+		tag_func_type=0;
+		grammar= 81 ;printlab(grammar);}//printf("@%s@%s@@",$$,$1);}
 	//| type_specifier declaration_specifiers  {grammar= 82 ; printlab(grammar);}
 	//| type_qualifier  {grammar= 83 ; printlab(grammar);}
 	//| type_qualifier declaration_specifiers  {grammar= 84 ; printlab(grammar);}
@@ -507,6 +524,9 @@ direct_declarator
 	: IDENTIFIER  
 	{strcpy($$,idTable1[$1.i_index]);
 		//printf("index=%d\n",$1.i_index);
+//	fseek(yyout,-5,SEEK_CUR);
+		
+//		fprintf(yyout,"successful");
 		grammar= 143 ; printlab(grammar);
 	}
 //	| '(' declarator ')'  {grammar= 144 ; printlab(grammar);}
@@ -527,28 +547,28 @@ direct_declarator
 	//| direct_declarator '[' ']' {grammar=152  ; printlab(grammar);}
 	| direct_declarator '('  parameter_type_list nul ')' 
 		{grammar=  153; printlab(grammar);
-		tag_dec_fun=1;
+		strcpy(function_name_table[kj],$1);	
 		strcat($1,"(");
-//		strcat($3,decl_type);
-//
-//		strcat($3,"* r");
-//		strcat($3,decl_type);
-//		strcat($3,"* r_");
 		strcat($1,$3);
 		strcat($1,")");
 		strcpy($$,$1);}
 	//| direct_declarator '(' identifier_list ')' {grammar=154  ; printlab(grammar);}
-	| direct_declarator '(' nul1 ')' 
+	| direct_declarator '(' ')' 
 		{grammar=155  ; printlab(grammar);
+		strcpy(function_name_table[kj],$1);	
 		strcat($1,"(");
 		strcat($1,")");
 		strcpy($$,$1);}
 	;
 nul
-	: {printf("X ,%s *r,%s *r_ )",decl_type,decl_type);}//X means delete previous char
+	: {fseek(yyout,-1,SEEK_CUR);
+		if(strcmp(decl_type,"void"))
+		fprintf(yyout,",%s *r,%s *r_ )",decl_type,decl_type);}//X means delete previous char
 	;
 nul1
-	: {printf("X %s *r,%s *r_ )",decl_type,decl_type);}//X means delete previous char
+	: {fseek(yyout,-1,SEEK_CUR);
+		if(strcmp(decl_type,"void"))
+		fprintf(yyout,"%s *r,%s *r_ )",decl_type,decl_type);}//X means delete previous char
 	;
 
 pointer
@@ -565,7 +585,10 @@ pointer
 */
 
 parameter_type_list
-	: parameter_list  {grammar=158  ; printlab(grammar);}
+	: parameter_list 
+		{grammar=158  ;
+		fprintf(yyout,",%s",$$);
+	       	printlab(grammar);}
 	//| parameter_list ',' ELLIPSIS {grammar= 159 ; printlab(grammar);}
 	;
 
@@ -582,7 +605,8 @@ parameter_declaration
 	: declaration_specifiers declarator  
 		{grammar= 163 ; printlab(grammar);
 		strcat($1,$2);
-		strcpy($$,$1);}
+		strcpy($$,$1);
+		}
 	//| declaration_specifiers abstract_declarator  {grammar= 164 ; printlab(grammar);}
 	//| declaration_specifiers  {grammar=  165; printlab(grammar);}
 	;
@@ -668,8 +692,17 @@ statement
 		{grammar= 198 ; printlab(grammar);
 	//	printf("p=%d,in=%d\n",p_varible,varible[p_varible]);
 		if(!tag_function)
-			printf("%s\n",$1);
-	fprintf(fp,"%s\n",$1);	
+			fprintf(yyout,"%s\n",$1);
+		else
+		{
+		int kjtmp=0;
+		for(kjtmp=0;kjtmp<kj;kjtmp++)
+		   if(strcmp(function_name_table[kjtmp],function_name)==0)
+			   break;
+		fprintf(yyout,"if(ecf!=%d)\nerror()\n",kjtmp);
+		
+		}	
+		//fprintf(fp,"%s\n",$1);	
 				//printf("if(");
 		char var[10][50];
 	 	char var1[10][50];
@@ -708,7 +741,7 @@ statement
 		}	
 		}
 		while(p_var){
-		printf("-----%s\n",var[p_var]);
+		fprintf(yyout,"-----%s\n",var[p_var]);
 		p_var--;
 		}
 
@@ -805,21 +838,24 @@ jump_statement
 	//| CONTINUE ';'  {grammar= 223 ; printlab(grammar);}
 	//| BREAK ';'  {grammar=  224; printlab(grammar);}
 	: RETURN ';'  {grammar= 225 ; printlab(grammar);}
-	| RETURN { tag_control=1;} expression ';'  {printf("r=%s",$3);tag_control=0;tag_assign=0;grammar= 226 ; printlab(grammar);}
+	| RETURN { tag_control=1;} expression ';'  
+		{fprintf(yyout,"\n*r=%s;\n*r_ =%s;\n",$3,$3);
+			fprintf(yyout,"ecf=%d\n",kj);
+			tag_control=0;tag_assign=0;grammar= 226 ; printlab(grammar);}
 	;
 
 translation_unit
-	: external_declaration  {grammar=227 ; printlab(grammar);}
+	: external_declaration  {grammar=227 ; printlab(grammar);tag_func_type=1;}
 	| translation_unit external_declaration  {grammar=  228; printlab(grammar);}
 	;
 
 external_declaration
-	: function_definition  {grammar= 229 ; printlab(grammar);}
+	: function_definition  {grammar= 229 ; printlab(grammar);kj++;}
 	| declaration  {grammar= 230 ; printlab(grammar);}
 	;
 
 function_definition
-	: declaration_specifiers declarator declaration_list compound_statement  {grammar=231  ; printlab(grammar);fprintf(fp,"%s",$$);}
+	: declaration_specifiers  declarator declaration_list compound_statement  {grammar=231  ; printlab(grammar);}
 	| declaration_specifiers declarator compound_statement  {grammar= 232 ; printlab(grammar);}
 	;
 
@@ -837,23 +873,25 @@ declaration_list
 void yyerror(char const *s)
 {
 	fflush(stdout);
-	printf("\n%*s\n%*s\n", column, "^", column, s);
+	fprintf(yyout,"\n%*s\n%*s\n", column, "^", column, s);
 }
 
 void printlab(int i){
 used[i]=1;
-//printf("%d\n",i);
+//fprintf(yyout,"%d\n",i);
 }
 
 void openfile(){
-fp=fopen("tes.c","w");
+fp=fopen("test.c","w");
+if(fp==NULL)
+	printf("errorrrrrrrrrrrrrrrrrrrrrrrrr");
 }
 void fprint(char  str[]){
 fputs(str,fp);
 }
 void main()
         {
-openfile();  
+//openfile();  
     yyparse();
 
 
