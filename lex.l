@@ -249,8 +249,8 @@ for(j=0;j<yyleng;j++)
 idTable[idIndex][j]=yytext[j];
 idTable1[idIndex][j]=yytext[j];
 }
-idTable1[idIndex][j]='_';
-idTable1[idIndex][j+1]=' ';
+idTable1[idIndex][j]=' ';
+idTable1[idIndex][j+1]='_';
 //idTable1[idIndex][j+2]='|';
 //idTable1[idIndex][j+3]='|';
 

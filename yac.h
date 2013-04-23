@@ -32,6 +32,7 @@ struct con stu_index;//index in IDENTIFIER CONSTANT STRING_LITERAL table
 //%type <itype>type_specifier  
 %type <str>postfix_expression
 %type <str>argument_expression_list
+%type <str>ael
 %type <str>unary_expression
 %type <str>unary_operator
 %type <str>cast_expression
@@ -86,8 +87,8 @@ struct con stu_index;//index in IDENTIFIER CONSTANT STRING_LITERAL table
 #include <stdlib.h>
 //extern char yytext[];
 void printlab();
-FILE *fp;
 extern FILE *yyout;
+extern FILE *yyin;
 int grammar;
 int used[250]={0};
 int varible[10][2];//save IDENTIFIER in expression
@@ -99,12 +100,13 @@ int tag_array=0;
 int tag_function=0;
 int tag_func_type=1;//function declara type,save type onle once
 char decl_type[10];//save type_specifier used for function declaration
-int tag_parameter=0;////function parameter declaration,used for r,r_ output only once
+int tag_parameter=0;////function parameter declaration,used for r,r _output only once
 int ecf=0;//global varible
 
 char function_name_table[table_len][id_len];//index is kj
 int kj=0;
 char function_name[id_len];//save function name in expression,for rule 8, if(ecf!=kj) error
+//char func_name[id_len];//save function name in declaration 
 int tag_func_expr=0;//tag for if function used in expression
 //struct name_kj{//procedure associated wwith kj;
 //char func_name[id_len];
@@ -112,7 +114,11 @@ int tag_func_expr=0;//tag for if function used in expression
 //};
 //struct name_kj func_kj[table_len];
 
-int ki[];
+int ki[10];
+
+
+char unary_expr[100];//left expression in assignment expression which right part is a function
+//int tag_assign_op=0;//assignment operator appeard,
 
 struct node{
 int index;
@@ -170,7 +176,8 @@ postfix_expression
 	        strcpy($$,$1);	
 		}
 
-	|  postfix_expression '(' {tag_function=1;} argument_expression_list ')'  
+	//|  postfix_expression '(' {tag_function=1;} argument_expression_list ')'  
+	|  postfix_expression '(' {tag_function=1;} ael ')'  
 	{	strcpy(function_name,$1);
 		grammar= 8 ; 
 		printlab(grammar);
@@ -186,7 +193,22 @@ postfix_expression
 		strcpy($$,$1);
 		}
 	;
-
+ael
+	:argument_expression_list
+		{     char ch='q';
+		fseek(yyout,-1,SEEK_CUR);
+		 ch=fgetc(yyout);
+		
+			while(ch!=')')
+		{fseek(yyout,-2,SEEK_CUR);
+			ch=fgetc(yyout);
+		printf("%c",ch);
+		}
+		fseek(yyout,-1,SEEK_CUR);
+		fprintf(yyout,",%s)",$1);
+		
+		
+		}
 argument_expression_list
 	: assignment_expression  {grammar= 15 ; printlab(grammar);}
 	| argument_expression_list ',' assignment_expression  
@@ -198,7 +220,12 @@ argument_expression_list
 	;
 
 unary_expression
-	: postfix_expression  {grammar= 17 ; printlab(grammar);}
+	: postfix_expression  
+		{grammar= 17 ;
+	       	printlab(grammar);
+	//	if(tag_assign_op)
+	//	strcpy(unary,$1);
+		}
 	| INC_OP unary_expression  
 		{grammar= 18 ; printlab(grammar);
  		strcpy($$,"++");
@@ -342,7 +369,9 @@ assignment_expression
 
 assignment_operator
 	: '='   {grammar= 63 ; printlab(grammar);
-	strcpy($$,"=");tag_assign=1;}
+	strcpy($$,"=");tag_assign=1;
+	//tag_assign_op=0;
+	}
 	| MUL_ASSIGN  {grammar= 64 ; printlab(grammar);}
 	| DIV_ASSIGN  {grammar= 65 ; printlab(grammar);}
 	| MOD_ASSIGN  {grammar= 66 ; printlab(grammar);}
@@ -523,10 +552,6 @@ declarator
 direct_declarator
 	: IDENTIFIER  
 	{strcpy($$,idTable1[$1.i_index]);
-		//printf("index=%d\n",$1.i_index);
-//	fseek(yyout,-5,SEEK_CUR);
-		
-//		fprintf(yyout,"successful");
 		grammar= 143 ; printlab(grammar);
 	}
 //	| '(' declarator ')'  {grammar= 144 ; printlab(grammar);}
@@ -553,22 +578,32 @@ direct_declarator
 		strcat($1,")");
 		strcpy($$,$1);}
 	//| direct_declarator '(' identifier_list ')' {grammar=154  ; printlab(grammar);}
-	| direct_declarator '(' ')' 
-		{grammar=155  ; printlab(grammar);
+	| direct_declarator '(' nul1 ')' 
+		{
+			grammar=155  ; printlab(grammar);
 		strcpy(function_name_table[kj],$1);	
 		strcat($1,"(");
 		strcat($1,")");
 		strcpy($$,$1);}
 	;
 nul
-	: {fseek(yyout,-1,SEEK_CUR);
+	: {
 		if(strcmp(decl_type,"void"))
-		fprintf(yyout,",%s *r,%s *r_ )",decl_type,decl_type);}//X means delete previous char
+		fprintf(yyout,",%s *r,%s *r _)",decl_type,decl_type);}//X means delete previous char
 	;
 nul1
-	: {fseek(yyout,-1,SEEK_CUR);
+	:{      char ch='q';
+		fseek(yyout,-1,SEEK_CUR);
+		 ch=fgetc(yyout);
+		
+			while(ch!=')')
+		{fseek(yyout,-2,SEEK_CUR);
+			ch=fgetc(yyout);
+		printf("%c",ch);
+		}
+		fseek(yyout,-1,SEEK_CUR);
 		if(strcmp(decl_type,"void"))
-		fprintf(yyout,"%s *r,%s *r_ )",decl_type,decl_type);}//X means delete previous char
+		fprintf(yyout,"%s *r,%s *r _)",decl_type,decl_type);}//X means delete previous char
 	;
 
 pointer
@@ -587,6 +622,17 @@ pointer
 parameter_type_list
 	: parameter_list 
 		{grammar=158  ;
+	     	 char ch='q';
+		fseek(yyout,-1,SEEK_CUR);
+		 ch=fgetc(yyout);
+		
+			while(ch!=')')
+		{fseek(yyout,-2,SEEK_CUR);
+			ch=fgetc(yyout);
+		printf("%c",ch);
+		}
+		fseek(yyout,-1,SEEK_CUR);
+
 		fprintf(yyout,",%s",$$);
 	       	printlab(grammar);}
 	//| parameter_list ',' ELLIPSIS {grammar= 159 ; printlab(grammar);}
@@ -839,7 +885,7 @@ jump_statement
 	//| BREAK ';'  {grammar=  224; printlab(grammar);}
 	: RETURN ';'  {grammar= 225 ; printlab(grammar);}
 	| RETURN { tag_control=1;} expression ';'  
-		{fprintf(yyout,"\n*r=%s;\n*r_ =%s;\n",$3,$3);
+		{fprintf(yyout,"\n*r=%s;\n*r _=%s;\n",$3,$3);
 			fprintf(yyout,"ecf=%d\n",kj);
 			tag_control=0;tag_assign=0;grammar= 226 ; printlab(grammar);}
 	;
@@ -881,33 +927,34 @@ used[i]=1;
 //fprintf(yyout,"%d\n",i);
 }
 
-void openfile(){
-fp=fopen("test.c","w");
-if(fp==NULL)
-	printf("errorrrrrrrrrrrrrrrrrrrrrrrrr");
-}
-void fprint(char  str[]){
-fputs(str,fp);
-}
-void main()
+int main()
         {
-//openfile();  
-    yyparse();
+char file_name[100];
+printf("input file name:\n");
+scanf("%s",file_name);
+yyin=fopen(file_name,"r");
+if(yyin==NULL)
+{printf("no file");
+return -1;	}
+else
+printf("open successful!\n");
+yyout=fopen("test.c","w+");
+yyparse();
 
+fclose(yyout);
 
-
-printf("----------------");
-int i=0;
-for(i=0;i<250;i++){
-if(used[i]==1)
-printf("%d\n",i);
-      
-}
-printf("!!!!!!!!!!!!!\n");
-for(i=0;i<table_len;i++){
-printf("%s@\n",strTable[i]);
-printf("i=%d,%s\n",i,idTable1[i]);
-
-
-} 
+//printf("----------------");
+//int i=0;
+//for(i=0;i<250;i++){
+//if(used[i]==1)
+////printf("%d\n",i);
+//      
+//}
+//printf("!!!!!!!!!!!!!\n");
+//for(i=0;i<table_len;i++){
+////printf("%s@\n",strTable[i]);
+////printf("i=%d,%s\n",i,idTable1[i]);
+//
+//
+//} 
       }
