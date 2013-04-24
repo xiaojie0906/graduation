@@ -34,12 +34,12 @@ char constTable[table_len][2];
 "_Complex"		{ count();strcpy(yylval.str,"_Complex"); return(COMPLEX); }
 "const"			{ count();strcpy(yylval.str,"const"); return(CONST); }
 "continue"		{ count();strcpy(yylval.str,"continue"); return(CONTINUE); }
-"default"		{ count();strcpy(yylval.str,"continue"); return(DEFAULT); }
-"do"			{ count();strcpy(yylval.str,"default"); return(DO); }
-"double"		{ count();strcpy(yylval.str,"do"); yylval.itype=DOUBLE;return(DOUBLE); }
-"else"			{ count();strcpy(yylval.str,"double"); return(ELSE); }
-"enum"			{ count();strcpy(yylval.str,"else"); return(ENUM); }
-"extern"		{ count();strcpy(yylval.str,"enum"); return(EXTERN); }
+"default"		{ count();strcpy(yylval.str,"default"); return(DEFAULT); }
+"do"			{ count();strcpy(yylval.str,"do"); return(DO); }
+"double"		{ count();strcpy(yylval.str,"double"); yylval.itype=DOUBLE;return(DOUBLE); }
+"else"			{ count();strcpy(yylval.str,"else"); return(ELSE); }
+"enum"			{ count();strcpy(yylval.str,"enum"); return(ENUM); }
+"extern"		{ count();strcpy(yylval.str,"extern"); return(EXTERN); }
 "float"			{ count();strcpy(yylval.str,"float");return(FLOAT); }
 "for"			{ count();strcpy(yylval.str,"for"); return(FOR); }
 "goto"			{ count();strcpy(yylval.str,"goto"); return(GOTO); }
@@ -249,13 +249,13 @@ for(j=0;j<yyleng;j++)
 idTable[idIndex][j]=yytext[j];
 idTable1[idIndex][j]=yytext[j];
 }
-idTable1[idIndex][j]=' ';
-idTable1[idIndex][j+1]='_';
+idTable1[idIndex][j]='_';
+//idTable1[idIndex][j+1]='_';
 //idTable1[idIndex][j+2]='|';
 //idTable1[idIndex][j+3]='|';
 
 idTable[idIndex][j]='\0';
-idTable1[idIndex][j+4]='\0';
+idTable1[idIndex][j+1]='\0';
 yylval.stu_index.i_index=idIndex;
 yylval.stu_index.i_type=IDENTIFIER;
 idIndex++;
