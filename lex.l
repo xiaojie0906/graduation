@@ -19,9 +19,16 @@ void insert();
 //char strTable[table_len][str_len];
 //char idTable[table_len][id_len];
 char constTable[table_len][2];
+void insertstr();
+void comment();
 %}
 
 %%
+"#"			{count();strcpy(yylval.str,"#");return('#');}
+"define"		{count();strcpy(yylval.str,"define");return(DEFINE);}
+"include"		{count();strcpy(yylval.str,"include");return(INCLUDE);}
+
+
 "/*"			{ comment(); }
 "//"[^\n]*              { /* consume //-comment */ }
 
@@ -143,7 +150,7 @@ return 1;
 }
 
 
-void comment(void)
+void comment()
 {
 	char c, prev = 0;
   
@@ -249,7 +256,7 @@ for(j=0;j<yyleng;j++)
 idTable[idIndex][j]=yytext[j];
 idTable1[idIndex][j]=yytext[j];
 }
-idTable1[idIndex][j]='_';
+idTable1[idIndex][j]='$';
 //idTable1[idIndex][j+1]='_';
 //idTable1[idIndex][j+2]='|';
 //idTable1[idIndex][j+3]='|';

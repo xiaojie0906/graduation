@@ -14,6 +14,7 @@ struct con stu_index;//index in IDENTIFIER CONSTANT STRING_LITERAL table
 
 
 }  
+%token <str>INCLUDE <str>DEFINE
 %token <stu_index> IDENTIFIER <stu_index>CONSTANT <stu_index>STRING_LITERAL SIZEOF
 %token <str>PTR_OP <str>INC_OP <str>DEC_OP <str>LEFT_OP RIGHT_OP LE_OP GE_OP <str>EQ_OP <str>NE_OP
 %token <str>AND_OP <str>OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
@@ -89,6 +90,8 @@ struct con stu_index;//index in IDENTIFIER CONSTANT STRING_LITERAL table
 void printlab();
 extern FILE *yyout;
 extern FILE *yyin;
+void saveword(char ch,char word[]);
+void back(char ch);
 int grammar;
 int used[250]={0};
 /*used for rule 1*/
@@ -104,8 +107,10 @@ int eki=0;// associated with ki
 int ki=0;// block each block associated with a value
 /*used for rule 5*/
 /*used for rule 6*/
-static int ifor=0;//for for statement ,3 expression_statament,0,first,1,second,2
+int ifor=0;//for for statement ,3 expression_statament,0,first,1,second,2
 char for_test[200];//for statement conditional-expresion
+int tag_delete_braces=0;
+
 /*used for rule 7*/
 /*used for rule 8*/
 int tag_call_proc=0;//tag call procedure,1,else 0
@@ -120,8 +125,8 @@ int varible[10][2];//save IDENTIFIER in expression
 int p_varible=0;//index 0f varible
 int vari_level=0;
 int tag_assign=0;//tag of assigment_expression  (right)
-int tag_for=0;//
-int tag_ret=0;//
+int tag_for=0;//for statement
+int tag_ret=0;//jump statement
 int tag_if=0;//if statement
 int tag_while=0;//while statement
 int tag_array=0;
@@ -136,8 +141,7 @@ int tag_func_expr=0;//tag for if function used in expression
 //};
 //struct name_kj func_kj[table_len];
 
-
-char left_expr1[100];
+char left_expr0[100];//origin left_expression
 char left_expr[100];//left expression in assignment expression which right part is a function
 
 char condi_expression[200];//save expression for test in if for while;
@@ -157,7 +161,6 @@ primary_expression
 		{grammar=1;
 		printlab(grammar);
 		strcpy($$,idTable1[$1.i_index]);
-		strcpy(left_expr1,idTable1[$1.i_index]);//save init id for left expression
 //	//	if(tag_assign&&!tag_if&&!tag_for&&!tag_ret){
 	//	varible[p_varible][0]=$1.i_index;
 	//	varible[p_varible][1]=vari_level;
@@ -170,13 +173,11 @@ primary_expression
 		{grammar= 2 ;
 		printlab(grammar);
 		strcpy($$,strTable[$1.i_index]);
-//		strcpy(left_expr1,strTable[$1.i_index]);
 		}
 	| STRING_LITERAL  
 		{grammar= 3 ;
 	       	printlab(grammar);
 		strcpy($$,strTable[$1.i_index]);
-//		strcpy(left_expr1,strTable[$1.i_index]);
 
 		}	
 		;
@@ -193,7 +194,7 @@ postfix_expression
 		strcat($1,$4);
 		strcat($1,"]"); 
 		strcpy($$,$1);}
-	| postfix_expression '(' {tag_call_proc=1;} noael')'//call procedure tag=1 
+	| postfix_expression '(' {tag_call_proc=1;strcpy(function_name,$1);} noael')'//call procedure tag=1 
 		{grammar= 7 ;
 		printlab(grammar);
 		strcpy(function_name,$1);
@@ -202,7 +203,7 @@ postfix_expression
 	        strcpy($$,$1);	
 		}
 
-	|  postfix_expression '(' {tag_call_proc=1;} ael ')' //call procedure tag=1 
+	|  postfix_expression '(' {tag_call_proc=1;strcpy(function_name,$1);} ael ')' //call procedure tag=1 
 	{	strcpy(function_name,$1);
 		grammar= 8 ; 
 		printlab(grammar);
@@ -221,30 +222,49 @@ postfix_expression
 
 noael
 	:{
+		/*rule 8 test ecf when return fron procedure*/
+		int kjtmp=0;
+		for(kjtmp=0;kjtmp<kj;kjtmp++)//search kj associated with the function
+		   if(strcmp(function_name_table[kjtmp],function_name)==0)
+			   break;
+		if(kjtmp<kj)//not system or lib function
+		{
 		if(tag_assign_op){
 			back(')');
-			fprintf(yyout,"&%s",left_expr);//increase parameter &r &r_ in function
-			fprintf(yyout,",&%s)",left_expr1);
+			memset(left_expr0,'\0',100);
+			turn_expression(left_expr,left_expr0);
+			fprintf(yyout,"&%s",left_expr0);//increase parameter &r &r$ in function
+			fprintf(yyout,",&%s)",left_expr);
+	
 		}
 	
 	
-	}
+		}}
 
 
 ael
 	:argument_expression_list
 		{     
+		/*rule 8 test ecf when return fron procedure*/
+		int kjtmp=0;
+		for(kjtmp=0;kjtmp<kj;kjtmp++)//search kj associated with the function
+		   if(strcmp(function_name_table[kjtmp],function_name)==0)
+			   break;
+		if(kjtmp<kj)//not system or lib function
+		{
 		back(')');
 		fprintf(yyout,",%s",$1);
 		
-		if(tag_assign_op){
-			fprintf(yyout,",&%s",left_expr);
-			fprintf(yyout,",&%s)",left_expr1);
-		}
-		else
+			if(tag_assign_op){
+			memset(left_expr0,'\0',100);
+			turn_expression(left_expr,left_expr0);
+			fprintf(yyout,",&%s",left_expr0);
+			fprintf(yyout,",&%s)",left_expr);
+		         }
+         		else
 			fprintf(yyout,")");
 		
-		}
+		}}
 argument_expression_list
 	: assignment_expression  {grammar= 15 ; printlab(grammar);}
 	| argument_expression_list ',' assignment_expression  
@@ -375,7 +395,7 @@ logical_and_expression
 	: inclusive_or_expression  {grammar= 55 ; printlab(grammar);}
 	| logical_and_expression AND_OP inclusive_or_expression  {grammar= 56 ; printlab(grammar);
 		strcpy($$,$1);
-		strcat($$,$2);
+		strcat($$,"&&");
 		strcat($$,$3);}
 	;
 
@@ -621,16 +641,16 @@ direct_declarator
 	//| direct_declarator '[' type_qualifier_list '*' ']' {grammar= 150 ; printlab(grammar);}
 	//| direct_declarator '[' '*' ']' {grammar= 151 ; printlab(grammar);}
 	//| direct_declarator '[' ']' {grammar=152  ; printlab(grammar);}
-	| direct_declarator '('  parameter_type_list nul ')' 
+	| direct_declarator '('{strcpy(function_name,$1);}  parameter_type_list addr')' 
 		{grammar=  153;
 		printlab(grammar);
 		strcpy(function_name_table[kj],$1);//Rule7,save function in function_name_talble associated with kj	
 		strcat($1,"(");
-		strcat($1,$3);
+		strcat($1,$4);
 		strcat($1,")");
 		strcpy($$,$1);}
 	//| direct_declarator '(' identifier_list ')' {grammar=154  ; printlab(grammar);}
-	| direct_declarator '(' nul1 ')' 
+	| direct_declarator '(' {strcpy(function_name,$1);}addr1 ')' 
 		{
 			grammar=155  ; printlab(grammar);
 		strcpy(function_name_table[kj],$1);	// rule 7,save function in function_name_talble associated with kj	
@@ -638,21 +658,31 @@ direct_declarator
 		strcat($1,")");
 		strcpy($$,$1);}
 	;
-nul
+addr
 	: {
-		if(strcmp(decl_type,"void")!=0)
-		fprintf(yyout,",%s *r,%s *r_)",decl_type,decl_type);//X means delete previous char
+		printf("function_name=%s",function_name);
+		/*rule 8 test ecf when return fron procedure*/
+		if(strcmp(function_name,"main$")!=0)//if it is main function ,not add parameter
+		{
+			if(strcmp(decl_type,"void"))
+		fprintf(yyout,",%s *r,%s *r$)",decl_type,decl_type);//
 		else
 		fprintf(yyout,")");}
+	}
 		;
-nul1
+addr1
 	:{     
+		printf("function_name=%s",function_name);
+		/*rule 8 test ecf when return fron procedure*/
+		/*rule 8 test ecf when return fron procedure*/
+		if(strcmp(function_name,"main$")!=0)//if it is main function ,not add parameter
+		{
 	       back(')');	
-		if(strcmp(decl_type,"void")!=0)
-		fprintf(yyout,"%s *r,%s *r_)",decl_type,decl_type);//X means delete previous char
+		if(strcmp(decl_type,"void"))
+		fprintf(yyout,"%s *r,%s *r$)",decl_type,decl_type);//
 		else
 		fprintf(yyout,")");}
-	;
+		};
 
 pointer
 	: '*' {grammar=235  ;strcpy($$,"*"); printlab(grammar);}
@@ -783,7 +813,7 @@ designator
 statement
 	//: labeled_statement  {grammar=  196; printlab(grammar);}
 	: compound_statement  {grammar= 197 ; printlab(grammar);}
-	| ineki expression_statement  
+	| expression_statement  
 		{grammar= 198 ; printlab(grammar);
 		}
 	| selection_statement  {grammar=  199; printlab(grammar);}
@@ -798,14 +828,29 @@ statement
 	;
 */
 compound_statement
-	: '{'	'}'
+	: '{'
+	{if(tag_delete_braces) 
+		{char word[500];
+			memset(word,'\0',500);
+	saveword('{',word);
+	fseek(yyout,-1,SEEK_CUR);
+		tag_delete_braces=0;}}
+		'}'
 	{grammar= 205 ; printlab(grammar);
 		strcpy($$,"{ }");		}
 
-	|'{' block_item_list outeki '}'
+	 |'{'
+	{if(tag_delete_braces) {
+	char word[500];
+			memset(word,'\0',500);
+	saveword('{',word);
+	fseek(yyout,-1,SEEK_CUR);
+	fprintf(yyout,"%s",word);
+		tag_delete_braces=0;}}	
+       	block_item_list outeki '}'
 	{grammar=  206; printlab(grammar);
 		strcpy($$,"{"); 
-		strcat($$,$2);
+		strcat($$,$3);
 		strcat($$,"}");}
 	;
 	
@@ -814,10 +859,12 @@ compound_statement
 ineki
 	:
 	{	/*rule 4,enter into block,print eki=ki */
-		if(in1_out2==2&&!tag_for){
-		char word[500];
-		memset(word,'\0',500);
-		saveword('\n',word);//save expression
+		
+		if(in1_out2==2&&!tag_for){//for_statement contain expression_statement,so use tag_for to exclude it
+		char word[100];
+		memset(word,'\0',100);
+		preword(word);//save expression
+		
 		fprintf(yyout,"eki=%d;\n%s",ki,word);
 		       in1_out2=1;//means has enter in
 		}
@@ -827,9 +874,9 @@ outeki
 	:
 	{	/*rule 4,get out block,check eki  */
 		if(in1_out2==1){
-		char word[500];
-		memset(word,'\0',500);
-		saveword('\n',word);
+		char word[100];
+		memset(word,'\0',100);
+		preword(word);//save expression
 		fprintf(yyout,"\nif(eki!=%d)\nerror5();\n%s",ki,word);ki++;
 		       in1_out2=2;}
 	}
@@ -855,41 +902,67 @@ expression_statement
 		{grammar= 212 ; printlab(grammar);
 		strcpy($$,$1);
 	       	strcat($$,";");
-		
+		//printf("tag_cond_assign=%d&&!tag_call_proc=%d&&!tag_for=%d&&!tag_if=%d&&!tag_ret=%d&&tag_while=%d",tag_cond_assign,tag_call_proc,tag_for,tag_if,tag_ret,tag_while);
 		/* rule3,check if x1=x2? */	
-		if(tag_cond_assign==2&&!tag_call_proc&&!tag_for&&!tag_if&&!tag_ret&&tag_while)//expression right part has not function
-		{	
-		//	fprintf(yyout,"\n%s\n",$1);//assignment expression
+		if(tag_cond_assign==2&&!tag_call_proc&&!tag_for&&!tag_if&&!tag_ret&&!tag_while)//expression right part has not function
+		{          
+			if(in1_out2==2)
+			{
+		char word[500];
+		memset(word,'\0',500);
+			saveword('\n',word);
+		fprintf(yyout,"\neki=%d;\n%s",ki,word);
+		in1_out2=1;	
+			}
+			/*  RULE2  write operation copy */	
+			fprintf(yyout,"\n%s;\n",$1);//assignment expression
 		
-			//if not test expression ,print detect
-		fprintf(yyout,"if(%s!=%s)\nerror();\n",left_expr,left_expr1);
+			/*rule 3 if not test expression ,print detect*/
+			memset(left_expr0,'\0',100);
+			turn_expression(left_expr,left_expr0);
+		fprintf(yyout,"\nif(%s!=%s)\nerror3();\n",left_expr0,left_expr);
 		}
 
-		/*   rule 8,if call procedure in expression,check ecf*/
 		else if(tag_call_proc)
 		{
+		/*check eki if call proc */
+		if(in1_out2==1){
+		char word[500];
+		memset(word,'\0',500);
+			saveword('\n',word);
+		fprintf(yyout,"\nif(eki!=%d)\nerror5();\n%s",ki,word);ki++;
+		in1_out2=2;	
+		}	
+			
+		/*   rule 8,if call procedure in expression,check ecf*/
+		/*rule 8 test ecf when return fron procedure*/
 		int kjtmp=0;
 		for(kjtmp=0;kjtmp<kj;kjtmp++)//search kj associated with the function
 		   if(strcmp(function_name_table[kjtmp],function_name)==0)
 			   break;
 		if(kjtmp<kj)
 		fprintf(yyout,"\nif(ecf!=%d)\nerror8();\n",kjtmp);
-		tag_call_proc=0;
+		tag_call_proc=0;		
 		}
 		else if(tag_for==1){/*rule 6,in for statement*/	
 		
 		if(ifor==0)
 		{back(';');
-			fprintf(yyout,",%s;",$1);
+			fprintf(yyout,",%s;",$1);//dumplicate first expression_statement in for statement
 		}
 			else if(ifor==1)
 		{
+			printf("the test is=%s",$1);
 		strcpy(for_test,$1);	
 				//fprintf(yyout,"&&(%s);",$1);
 		}
 		ifor++;
 				
 		}	
+		
+		
+		
+		
 		tag_assign=0;
 	//	char var[10][50];
 	// 	char var1[10][50];
@@ -967,9 +1040,10 @@ rule6
 		//	if(word[i]=='{')
 		//	{word[i]=' ';//delete first '{'
 		//	break;}
-	fprintf(yyout,"--\n{/*add*/ \nif(!(%s))\nerror6();\n%s",condi_expression,word);
+	fprintf(yyout,"\n{\nif(!(%s))\nerror6();\n%s",condi_expression,word);
 		tag_if=0;
 		tag_while=0;
+		tag_delete_braces=1;//delete '{' in statement
 	}
 whilesta
 	:outeki
@@ -981,13 +1055,13 @@ iteration_statement
 //	| FOR '(' expression_statement expression_statement ')' statement  {grammar= 218 ; printlab(grammar);}
 	| FOR outeki {tag_for=1;}'(' expression_statement expression_statement expression ')' 
 		{	
-			if(tag_for==1&&ifor==2){
+			if(tag_for==1&&ifor==2){//coopy expression
 			   back(')');
 			fprintf(yyout,",%s)",$7);
 			ifor=0;
 			}
-	fprintf(yyout,"----\n/*add*/ \n{if(!(%s))\nerror6();\n",for_test);
-
+	fprintf(yyout,"\n{\nif(!(%s))\nerror6();\n",for_test);
+		tag_delete_braces=1;//delete '{' in statement
 		tag_for=0;
 		tag_assign=0;} 
 	 statement {grammar= 219 ; printlab(grammar);}
@@ -1003,19 +1077,22 @@ jump_statement
 	| RETURN outeki { tag_ret=1;} expression ';'  
 		{
 			tag_ret=0;
-			back('\n');	
-			fprintf(yyout,"\n*r=%s;\n*r_=%s;\n",$4,$4);
+		//printf("\nfunm=%s",function_name_table[kj]);
+			if(strcmp(function_name_table[kj],"main$"))
+		{	back('\n');	
+			fprintf(yyout,"\n*r=%s;\n*r$=%s;\n",$4,$4);
 			tag_assign=0;grammar= 226 ; printlab(grammar);}
-	;
+		}
+		;
 
 translation_unit
-	: external_declaration  {grammar=227 ; printlab(grammar);tag_func_type=1;}
+	: external_declaration  {grammar=227 ; printlab(grammar);}
 	| translation_unit external_declaration  {grammar=  228; printlab(grammar);}
 	;
 
 external_declaration
-	: function_definition  {grammar= 229 ; printlab(grammar);kj++;}
-	| declaration  {grammar= 230 ; printlab(grammar);}
+	: function_definition  {grammar= 229 ; printlab(grammar);kj++;tag_func_type=1;}
+	| declaration  {grammar= 230 ; printlab(grammar);tag_func_type=1;}
 	;
 
 function_definition
@@ -1059,26 +1136,53 @@ c=fgetc(yyout);
 fseek(yyout,-1,SEEK_CUR);
 
 }
-
+/*dont delete the char*/
 void saveword(char ch,char word[]){
 int i=0;
-char tmp[100];
-memset(tmp,'\0',100);
-	char  c='\0';
+char tmp[500];
+memset(tmp,'\0',500);
+char  c[2];
+c[1]='\0';
 	fseek(yyout,-1,SEEK_CUR);
-c=fgetc(yyout);
-printf("\n%c",c);
-while(c!=ch){
-strcpy(tmp,&c);
-printf("%c",c);
+c[0]=fgetc(yyout);
+while(c[0]!=ch){
+strcpy(tmp,c);
 strcat(tmp,word);
 strcpy(word,tmp);
-	fseek(yyout,-2,SEEK_CUR);
-	c=fgetc(yyout);
+fseek(yyout,-2,SEEK_CUR);
+c[0]=fgetc(yyout);
 }
 
 
 }
 
+void preword(char word[]){
+char tp[100];
+memset(tp,'\0',100);
+fseek(yyout,-1,SEEK_CUR);
+char ch[2];
+ch[1]='\0';
+ch[0]=fgetc(yyout);
 
-
+while(ch[0]==' '||ch[0]=='\n'){
+fseek(yyout,-2,SEEK_CUR);
+ch[0]=fgetc(yyout);
+}
+while(ch[0]!=' '&&ch[0]!='\n'){
+strcpy(tp,ch);
+strcat(tp,word);
+strcpy(word,tp);
+fseek(yyout,-2,SEEK_CUR);
+ch[0]=fgetc(yyout);
+}
+}
+void turn_expression(char expr[],char t_expr[]){
+int i=0,j=0;
+int length=strlen(expr);
+for(i=0;i<length;i++)
+{if(expr[i]!='$')
+	{t_expr[j]=expr[i];
+		j++;
+	}
+}
+}

@@ -37,14 +37,14 @@ ch=fgetc(yyin);
 fseek(yyin,-1,SEEK_CUR);
 
 fprintf(yyout,"int eki=0;\nint ecf=0;\n");
-fprintf(yyout,"int error1()\n{printf(\"error!!!!!!!!!!\")\n;\n}\n");
-fprintf(yyout,"int error2()\n{printf(\"error!!!!!!!!!!\")\n;\n}\n");
-fprintf(yyout,"int error3()\n{printf(\"error!!!!!!!!!!\")\n;\n}\n");
-fprintf(yyout,"int error4()\n{printf(\"error!!!!!!!!!!\")\n;\n}\n");
-fprintf(yyout,"int error5()\n{printf(\"error!!!!!!!!!!\")\n;\n}\n");
-fprintf(yyout,"int error6()\n{printf(\"error!!!!!!!!!!\")\n;\n}\n");
-fprintf(yyout,"int error7()\n{printf(\"error!!!!!!!!!!\")\n;\n}\n");
-fprintf(yyout,"int error8()\n{printf(\"error!!!!!!!!!!\")\n;\n}\n");
+fprintf(yyout,"int error1()\n{printf(\"error1\\n\");\n}\n");
+fprintf(yyout,"int error2()\n{printf(\"error2\\n\");\n}\n");
+fprintf(yyout,"int error3()\n{printf(\"error3\\n\");\n}\n");
+fprintf(yyout,"int error4()\n{printf(\"error4\\n\");\n}\n");
+fprintf(yyout,"int error5()\n{printf(\"error5\\n\");\n}\n");
+fprintf(yyout,"int error6()\n{printf(\"error6\\n\");\n}\n");
+fprintf(yyout,"int error7()\n{printf(\"error7\\n\");\n}\n");
+fprintf(yyout,"int error8()\n{printf(\"error8\\n\");\n}\n");
 yyparse();
 
 fclose(yyout);
